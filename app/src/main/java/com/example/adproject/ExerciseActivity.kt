@@ -2,6 +2,7 @@ package com.example.adproject
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.ListView
 import android.widget.Toast
@@ -23,7 +24,7 @@ import java.io.IOException
 
 class ExerciseActivity : AppCompatActivity() {
 
-    private lateinit var apiService: ApiService
+    lateinit var apiService: ApiService
     private val coroutineScope = CoroutineScope(Dispatchers.Main)
 
     // 定义筛选选项
@@ -106,6 +107,7 @@ class ExerciseActivity : AppCompatActivity() {
                 .build())
             .build()
 
+
         apiService = retrofit.create(ApiService::class.java)
 
         // 初始化视图
@@ -178,10 +180,25 @@ class ExerciseActivity : AppCompatActivity() {
 
         // 设置列表项点击事件
         questionList.setOnItemClickListener { _, _, position, _ ->
-            val selectedQuestion = adapter.getItem(position)
-            // 处理题目点击事件
-            // 例如：跳转到题目详情页面
+            // 拿到当前题目的 ID
+            val questionId = adapter.getItem(position)?.id ?: return@setOnItemClickListener
+
+            // 隐藏搜索和列表，显示 fragment 容器
+            findViewById<View>(R.id.searchCard).visibility = View.GONE
+            findViewById<View>(R.id.filterCard).visibility = View.GONE
+            questionList.visibility = View.GONE
+            findViewById<View>(R.id.fragmentContainer).visibility = View.VISIBLE
+
+            // 只传 ID，Fragment 里自己去加载 Base64 并解码
+            supportFragmentManager.beginTransaction()
+                .replace(
+                    R.id.fragmentContainer,
+                    QuestionFragment.newInstance(questionId)
+                )
+                .addToBackStack(null)
+                .commit()
         }
+
 
         // 设置滚动监听，实现分页加载
         questionList.setOnScrollListener(object : android.widget.AbsListView.OnScrollListener {
@@ -287,7 +304,11 @@ class ExerciseActivity : AppCompatActivity() {
                             if (resultDTO.errorMessage == null) {
                                 // ✅ 正确的获取方式 - 修复了类型匹配问题
                                 val questions: List<QsInform> = resultDTO.data?.items ?: emptyList()
+                                if (questions.isEmpty()) {
+                                    Toast.makeText(this@ExerciseActivity, "没有符合条件的题目", Toast.LENGTH_SHORT).show()
+                                }
                                 adapter.updateData(questions.toMutableList())
+
                                 // 可以在这里添加日志，例如：
                                 // Log.d("ExerciseActivity", "成功加载 ${questions.size} 道题目")
                             } else {
@@ -404,4 +425,12 @@ class ExerciseActivity : AppCompatActivity() {
         super.onDestroy()
         coroutineScope.cancel()
     }
+
+    fun showMainUI() {
+        findViewById<View>(R.id.searchCard).visibility = View.VISIBLE
+        findViewById<View>(R.id.filterCard).visibility = View.VISIBLE
+        questionList.visibility = View.VISIBLE
+        findViewById<View>(R.id.fragmentContainer).visibility = View.GONE
+    }
+
 }
