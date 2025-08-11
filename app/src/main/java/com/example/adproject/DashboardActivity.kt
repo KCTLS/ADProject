@@ -2,22 +2,33 @@ package com.example.adproject
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
-import android.widget.*
+import android.util.Log
+import android.widget.Button
+import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
+import com.example.adproject.api.ApiClient
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class DashboardActivity : AppCompatActivity() {
 
     private lateinit var chartView: LineChart
     private lateinit var last7Days: TextView
+    private var accuracyRates: List<Float> = emptyList()
+
+    // 统一使用你自己的 ApiClient / ApiService
+    private val api by lazy { ApiClient.api }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,7 +54,7 @@ class DashboardActivity : AppCompatActivity() {
             startActivity(Intent(this, ExerciseActivity::class.java))
         }
         dashboardButton.setOnClickListener {
-            setSelectedButton(dashboardButton)
+            setSelectedButton(dashboardButton) // 留在当前页
         }
         classButton.setOnClickListener {
             setSelectedButton(classButton)
@@ -54,18 +65,23 @@ class DashboardActivity : AppCompatActivity() {
             startActivity(Intent(this, HomeActivity::class.java))
         }
 
-        // 图表初始化
+        // 其它按钮
+        findViewById<Button>(R.id.answerHistoryButton).setOnClickListener {
+            startActivity(Intent(this, AnswerHistoryActivity::class.java))
+        }
+        findViewById<Button>(R.id.recommendedPracticeButton).setOnClickListener {
+            startActivity(Intent(this, RecommendedActivity::class.java))
+        }
+
+        // 图表
         chartView = findViewById(R.id.chartView)
         setupChart()
 
-        // 处理 Last 7 Days ▼ 点击事件
         last7Days = findViewById(R.id.last7Days)
-        last7Days.setOnClickListener {
-            showDayOptions()
-        }
+        last7Days.setOnClickListener { showDayOptions() }
 
-        // 初始显示 7 天
-        updateChartForDays(7)
+        // 请求数据
+        fetchAccuracyRates()
     }
 
     private fun setupChart() {
@@ -74,33 +90,22 @@ class DashboardActivity : AppCompatActivity() {
         chartView.xAxis.granularity = 1f
         chartView.axisRight.isEnabled = false
         chartView.axisLeft.axisMinimum = 0f
-        chartView.axisLeft.axisMaximum = 100f
+        chartView.axisLeft.axisMaximum = 100f // 百分比
     }
 
     private fun updateChartForDays(days: Int) {
-        val entries = when (days) {
-            3 -> listOf(
-                Entry(0f, 60f),
-                Entry(1f, 75f),
-                Entry(2f, 85f)
-            )
-            5 -> listOf(
-                Entry(0f, 65f),
-                Entry(1f, 70f),
-                Entry(2f, 80f),
-                Entry(3f, 85f),
-                Entry(4f, 90f)
-            )
-            7 -> listOf(
-                Entry(0f, 60f),
-                Entry(1f, 70f),
-                Entry(2f, 80f),
-                Entry(3f, 75f),
-                Entry(4f, 90f),
-                Entry(5f, 85f),
-                Entry(6f, 95f)
-            )
-            else -> emptyList()
+        if (accuracyRates.isEmpty()) {
+            Toast.makeText(this, "暂无图表数据", Toast.LENGTH_SHORT).show()
+            chartView.clear()
+            return
+        }
+
+        // 取“最近 N 天”，不足 N 天就展示全部
+        val recentRates = accuracyRates.takeLast(days)
+        Log.d("ChartUpdate", "展示最近 $days 天数据: $recentRates")
+
+        val entries = recentRates.mapIndexed { index, value ->
+            Entry(index.toFloat(), value * 100f) // 转成百分比
         }
 
         val dataSet = LineDataSet(entries, "Accuracy").apply {
@@ -108,7 +113,7 @@ class DashboardActivity : AppCompatActivity() {
             valueTextColor = getColor(R.color.black)
             lineWidth = 2f
             circleRadius = 4f
-            setDrawValues(false)
+            setDrawValues(true)
             setDrawCircles(true)
         }
 
@@ -122,21 +127,52 @@ class DashboardActivity : AppCompatActivity() {
         builder.setTitle("Select Duration")
         builder.setItems(options) { _, which ->
             when (which) {
-                0 -> {
-                    last7Days.text = "Last 3 Days ▼"
-                    updateChartForDays(3)
-                }
-                1 -> {
-                    last7Days.text = "Last 5 Days ▼"
-                    updateChartForDays(5)
-                }
-                2 -> {
-                    last7Days.text = "Last 7 Days ▼"
-                    updateChartForDays(7)
-                }
+                0 -> { last7Days.text = "Last 3 Days ▼"; updateChartForDays(3) }
+                1 -> { last7Days.text = "Last 5 Days ▼"; updateChartForDays(5) }
+                2 -> { last7Days.text = "Last 7 Days ▼"; updateChartForDays(7) }
             }
         }
         builder.show()
+    }
+
+    private fun fetchAccuracyRates() {
+        lifecycleScope.launch {
+            val (ok, msg, data) = withContext(Dispatchers.IO) {
+                try {
+                    val resp = api.dashboard()
+                    if (!resp.isSuccessful) {
+                        Triple(false, "网络错误: ${resp.code()}", emptyList<Float>())
+                    } else {
+                        val body = resp.body()
+                        // 约定：code==1 成功；data.accuracyRates 为 List<Float/Double/Int> 任意数值
+                        val listAny = body?.data?.accuracyRates ?: emptyList()
+                        val rates = listAny.map {
+                            when (it) {
+                                is Number -> it.toFloat()
+                                else -> it.toString().toFloatOrNull() ?: 0f
+                            }
+                        }
+                        val message = body?.msg ?: "OK"
+                        val success = (body?.code == 1)
+                        Triple(success, message, rates)
+                    }
+                } catch (e: Exception) {
+                    Triple(false, e.message ?: "请求失败", emptyList<Float>())
+                }
+            }
+
+            if (!ok) {
+                Toast.makeText(this@DashboardActivity, msg, Toast.LENGTH_SHORT).show()
+                // fallback：避免图表空白
+                accuracyRates = listOf(0.6f, 0.7f, 0.3f, 0.9f, 0.5f, 0.8f, 1.0f)
+            } else {
+                accuracyRates = data
+                if (accuracyRates.isEmpty()) {
+                    Toast.makeText(this@DashboardActivity, "暂无图表数据", Toast.LENGTH_SHORT).show()
+                }
+            }
+            updateChartForDays(7)
+        }
     }
 
     private fun setSelectedButton(selectedButton: Button) {
@@ -144,7 +180,6 @@ class DashboardActivity : AppCompatActivity() {
         findViewById<Button>(R.id.dashboardButton).isSelected = false
         findViewById<Button>(R.id.classButton).isSelected = false
         findViewById<Button>(R.id.homeButton).isSelected = false
-
         selectedButton.isSelected = true
     }
 }

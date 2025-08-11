@@ -16,6 +16,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:8080/student/\"")
     }
 
     buildTypes {
@@ -33,6 +35,13 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+    buildFeatures {
+        buildConfig = true
     }
 }
 
@@ -55,4 +64,12 @@ dependencies {
     implementation("com.github.bumptech.glide:glide:4.15.1")
     kapt("com.github.bumptech.glide:compiler:4.15.1") // 用于注解处理器
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
+
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-urlconnection:4.12.0") // ✅ 这里
+
+
 }

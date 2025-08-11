@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.TextView
-import com.bumptech.glide.Glide
+import com.example.adproject.model.QsInform
 
 // QuestionAdapter.kt
 class QuestionAdapter(context: Context, private val questions: MutableList<QsInform>) :
@@ -54,6 +54,9 @@ class QuestionAdapter(context: Context, private val questions: MutableList<QsInf
 
         return itemView!!
     }
+
+    // 在 QuestionAdapter 里加一个公开方法
+    fun getData(): List<QsInform> = questions  // questions 是你内部维护的列表变量名
 
     fun updateData(newData: List<QsInform>) {
         questions.clear()

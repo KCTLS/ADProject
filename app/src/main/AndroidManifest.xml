@@ -15,18 +15,34 @@
         android:theme="@style/Theme.ADProject"
         tools:targetApi="31"
         android:usesCleartextTraffic="true">
+
+        <!-- 登录页：作为入口，必须 android:exported="true" -->
         <activity
-            android:name=".ExerciseActivity"
+            android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <activity android:name=".DashboardActivity" />
-        <activity android:name=".ClassActivity" />
-        <activity android:name=".HomeActivity" />
+
+        <!-- 注册页：普通页面，exported=false -->
+        <activity
+            android:name=".RegisterActivity"
+            android:exported="false" />
+
+        <!-- 主入口（登录后进入）：ExerciseActivity -->
+        <activity
+            android:name=".ExerciseActivity"
+            android:exported="false" />
+
+        <activity android:name=".DashboardActivity" android:exported="false" />
+        <activity android:name=".ClassActivity" android:exported="false" />
+        <activity android:name=".HomeActivity" android:exported="false" />
+        <activity android:name=".AnnouncementActivity" android:exported="false" />
+        <activity android:name=".JoinClassActivity" android:exported="false"/>
+        <activity android:name=".RecommendedActivity" android:exported="false"/>
+        <activity android:name=".AnswerHistoryActivity" android:exported="false"/>
     </application>
 
 </manifest>
