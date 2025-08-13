@@ -1,4 +1,3 @@
-// AnnouncementAdapter.kt
 package com.example.adproject
 
 import android.content.Context
@@ -14,6 +13,12 @@ class AnnouncementAdapter(
     private val ctx: Context,
     private val data: MutableList<AnnouncementItem> = mutableListOf()
 ) : BaseAdapter() {
+
+    private var onItemClick: ((AnnouncementItem) -> Unit)? = null
+    private var onMarkRead: ((AnnouncementItem) -> Unit)? = null
+
+    fun setOnItemClick(block: (AnnouncementItem) -> Unit) { onItemClick = block }
+    fun setOnMarkRead(block: (AnnouncementItem) -> Unit) { onMarkRead = block }
 
     fun setItems(list: List<AnnouncementItem>) {
         data.clear()
@@ -35,9 +40,8 @@ class AnnouncementAdapter(
         v.findViewById<TextView>(R.id.tvSnippet).text = item.content
         v.findViewById<TextView>(R.id.tvTime).text = item.displayTime()
 
-        // 显示班级名，如果为空则隐藏
         v.findViewById<TextView?>(R.id.tvAuthor)?.let { tvAuthor ->
-            val clsName = item.className  // 这里用你的数据模型里的字段
+            val clsName = item.className
             if (!clsName.isNullOrBlank()) {
                 tvAuthor.text = clsName
                 tvAuthor.visibility = View.VISIBLE
@@ -46,10 +50,15 @@ class AnnouncementAdapter(
             }
         }
 
+        // 红点：仅根据后端 status 判断（0 未读 / 1 已读）
+        val dot = v.findViewById<View?>(R.id.dotUnread)
+        dot?.visibility = if ((item.status ?: 0) == 1) View.GONE else View.VISIBLE
 
-        // 可选：未读/置顶点位如果你要用，按需显示
-        // v.findViewById<View>(R.id.dotUnread)?.visibility = View.GONE
-        // v.findViewById<ImageView>(R.id.ivPinned)?.visibility = View.GONE
+        // 点击：交给外层去“标记已读并刷新”
+        v.setOnClickListener {
+            onItemClick?.invoke(item)
+            onMarkRead?.invoke(item)
+        }
 
         return v
     }

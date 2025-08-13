@@ -7,7 +7,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#E6F3DA"
-    android:fitsSystemWindows="true">   <!-- ✅ 关键：避开状态栏 -->
+    android:fitsSystemWindows="true">
 
     <!-- 顶部标题栏 -->
     <com.google.android.material.appbar.MaterialToolbar
@@ -24,7 +24,6 @@
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
-
 
     <!-- 下拉刷新包裹 ListView -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
@@ -43,7 +42,7 @@
             android:dividerHeight="8dp"
             android:padding="16dp"
             android:clipToPadding="false"
-            android:listSelector="@android:color/transparent"/>
+            android:listSelector="?attr/selectableItemBackground" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
     <!-- 空态提示 -->
@@ -75,7 +74,7 @@
             android:layout_marginTop="12dp"/>
     </LinearLayout>
 
-    <!-- 底部导航（与你现有风格一致） -->
+    <!-- 底部导航（保持你的风格） -->
     <LinearLayout
         android:id="@+id/bottomNav"
         android:layout_width="match_parent"

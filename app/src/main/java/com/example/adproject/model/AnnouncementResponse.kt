@@ -1,6 +1,8 @@
 // model/AnnouncementResponse.kt
 package com.example.adproject.model
 
+import com.google.gson.annotations.SerializedName
+
 data class AnnouncementResponse(
     val code: Int,
     val msg: String?,
@@ -12,11 +14,21 @@ data class AnnouncementList(
 )
 
 data class AnnouncementItem(
+    // 兼容后端字段名是 id 或 announcementId 的两种情况
+    @SerializedName(value = "announcementId", alternate = ["id"])
+    val announcementId: Int? = null,
+
     val title: String,
     val content: String,
-    val createTime: List<Int>, // [yyyy, M, d, HH, mm]
-    val classId: Int? = null,        // ✅ 新增：所属班级 id（我们在拉取时填上）
-    val className: String? = null
+
+    // 你现在的代码里用的是 [yyyy, M, d, HH, mm] 数组；保持不变
+    val createTime: List<Int>,
+
+    val classId: Int? = null,        // 按需你在前端补上的
+    val className: String? = null,   // 按需你在前端补上的
+
+    // 0=未读, 1=已读（后端返回即可；若后端暂时没给，可为空）
+    val status: Int? = null
 )
 
 // 小工具：把 createTime 转成可读字符串

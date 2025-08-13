@@ -81,6 +81,9 @@ interface ApiService {
     @GET("selectAnnouncement")
     suspend fun selectAnnouncement(@Query("classId") classId: Int): Response<AnnouncementResponse>
 
+    @POST("checkAnnouncement")
+    suspend fun checkAnnouncement(@Query("announcementId") announcementId: Int): Response<Result<Unit>>
+
     @POST("joinClass")
     suspend fun joinClass(
         @Query("accessType") accessType: String, // "byName" / "byLink"
@@ -98,4 +101,14 @@ interface ApiService {
     @GET("selectAssignment")
     suspend fun selectAssignment(@Query("assignmentId") assignmentId: Int)
             : retrofit2.Response<SelectAssignmentResponse>
+
+
+    // 完成作业，上报是否完成 + 准确率（后端参数名是 assignmentId）
+    @POST("finishAssignment")
+    suspend fun finishAssignment(
+        @Query("assignmentId") assignmentId: Int,
+        @Query("whether") whether: Int,
+        @Query("accuracy") accuracy: Double
+    ): Response<Result<Unit>>
+
 }

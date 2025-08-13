@@ -5,6 +5,9 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
     app:cardElevation="3dp"
     app:cardCornerRadius="14dp"
     app:strokeColor="@android:color/transparent"
@@ -45,12 +48,14 @@
                 android:contentDescription="@null"
                 android:src="@drawable/star_black"/>
 
+            <!-- 未读小红点：默认隐藏，Adapter 控制显示/隐藏 -->
             <View
                 android:id="@+id/dotUnread"
                 android:layout_width="8dp"
                 android:layout_height="8dp"
                 android:background="@drawable/bg_dot_unread"
-                android:visibility="gone"/>
+                android:visibility="gone"
+                android:contentDescription="@string/accessibility_unread_dot"/>
         </LinearLayout>
 
         <!-- 摘要 -->
