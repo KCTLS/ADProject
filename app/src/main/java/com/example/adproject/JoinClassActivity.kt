@@ -112,21 +112,19 @@ class JoinClassActivity : AppCompatActivity() {
     private fun updateMode(byToken: Boolean) {
         modeByToken = byToken
         etQuery.setText("")
+        inputLayout.error = null
+        inputLayout.isErrorEnabled = false
         btnAction.isEnabled = false
 
         if (byToken) {
             inputLayout.hint = "Enter token"
-            inputLayout.startIconDrawable = getDrawable(android.R.drawable.ic_lock_idle_lock)
-            btnAction.text = "Join"
-            emptyState.visibility = View.GONE
+            inputLayout.helperText = "示例：02f4fe40-ee5c-433c-9dd2-94946d6e2b79"
         } else {
             inputLayout.hint = "Enter class name"
-            inputLayout.startIconDrawable = getDrawable(android.R.drawable.ic_menu_search)
-            btnAction.text = "Join"
-            emptyState.visibility = View.VISIBLE
-            emptyText.text = "Enter a class name, then tap Join"
+            inputLayout.helperText = "示例：SA59 / Python / Java"
         }
     }
+
 
     private fun onJoinClicked() {
         val key = etQuery.text?.toString()?.trim().orEmpty()
@@ -147,35 +145,66 @@ class JoinClassActivity : AppCompatActivity() {
     }
 
     private fun join(accessType: String, key: String) {
+        // Token 模式可选：做个 UUID 粗校验，体验更好
+        if (modeByToken) {
+            val uuidRegex = Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\$")
+            if (!uuidRegex.matches(key)) {
+                inputLayout.error = "Token 格式看起来不对（应为 UUID）"
+                inputLayout.isErrorEnabled = true
+                return
+            }
+        }
+
         setLoading(true)
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 try {
                     val resp = api.joinClass(accessType, key)
-                    val body: JoinClassResponse? = resp.body()
-
+                    val body = resp.body()
                     if (!resp.isSuccessful || body == null) {
                         val raw = resp.errorBody()?.string()
                         Log.e("JoinClass", "HTTP ${resp.code()} ${resp.message()} body=$raw")
-                        false to "HTTP ${resp.code()}: ${resp.message()}"
+                        Triple(false, "网络/服务器错误：HTTP ${resp.code()}", -1)
                     } else {
-                        when (body.code) {
-                            1 -> true to (body.msg ?: "Joined successfully")
-                            0 -> true to (body.msg ?: "Already in this class") // 你后端示例
-                            else -> false to (body.msg ?: "Join failed")
-                        }
+                        // 统一交给上层根据 code/msg 分发
+                        Triple(true, body.msg.orEmpty(), body.code)
                     }
                 } catch (e: Exception) {
-                    false to (e.message ?: "Request failed")
+                    Triple(false, e.message ?: "请求失败", -1)
                 }
             }
 
             setLoading(false)
-            Toast.makeText(this@JoinClassActivity, result.second, Toast.LENGTH_SHORT).show()
-            if (result.first) {
-                setResult(RESULT_OK)
-                finish()
+
+            val (ok, msg, code) = result
+            if (!ok) {
+                inputLayout.error = msg
+                inputLayout.isErrorEnabled = true
+                Toast.makeText(this@JoinClassActivity, msg, Toast.LENGTH_SHORT).show()
+                return@launch
+            }
+
+            when (code) {
+                1 -> { // 成功
+                    Toast.makeText(this@JoinClassActivity, if (msg.isBlank()) "加入成功" else msg, Toast.LENGTH_SHORT).show()
+                    setResult(RESULT_OK)
+                    finish()
+                }
+                0 -> {
+                    // 业务不通过（例如：还未到加入时间 / 已过期 / 已满 / 不存在 / 已加入 等等）
+                    val tip = if (msg.isBlank()) "暂时无法加入，请稍后再试" else msg
+                    inputLayout.error = tip
+                    inputLayout.isErrorEnabled = true
+                    Toast.makeText(this@JoinClassActivity, tip, Toast.LENGTH_SHORT).show()
+                }
+                else -> {
+                    val tip = if (msg.isBlank()) "加入失败，请稍后再试" else msg
+                    inputLayout.error = tip
+                    inputLayout.isErrorEnabled = true
+                    Toast.makeText(this@JoinClassActivity, tip, Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
+
 }

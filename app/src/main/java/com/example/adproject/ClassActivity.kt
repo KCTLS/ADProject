@@ -7,7 +7,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -25,19 +24,13 @@ class ClassActivity : AppCompatActivity() {
     // --- 协程 ---
     private val uiScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
+    // 防抖，避免短时间重复拉取
+    @Volatile private var isLoading = false
+
     // --- UI ---
     private lateinit var homeworkListView: ListView
     private lateinit var adapter: ClassListAdapter
-
-    // 从 JoinClassActivity 返回成功时刷新
-    private val joinLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { res ->
-        if (res.resultCode == RESULT_OK) {
-            loadMyClasses()
-            Toast.makeText(this, "Joined successfully", Toast.LENGTH_SHORT).show()
-        }
-    }
+    private lateinit var leaveButton: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,8 +49,9 @@ class ClassActivity : AppCompatActivity() {
         findViewById<Button>(R.id.quizButton).setOnClickListener {
             Toast.makeText(this, "Go to Quiz", Toast.LENGTH_SHORT).show()
         }
-        findViewById<Button>(R.id.leaveButton).setOnClickListener {
-            Toast.makeText(this, "Leave class (TODO)", Toast.LENGTH_SHORT).show()
+        leaveButton = findViewById(R.id.leaveButton)
+        leaveButton.setOnClickListener {
+            startActivity(Intent(this, LeaveClassActivity::class.java))
         }
 
         // 底部导航
@@ -89,28 +83,36 @@ class ClassActivity : AppCompatActivity() {
         homeworkListView.addHeaderView(header, null, false)
         header.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnGoJoin)
             .setOnClickListener {
-                joinLauncher.launch(Intent(this, JoinClassActivity::class.java))
+                // 不用回传，回到本页时 onResume 会自动刷新
+                startActivity(Intent(this, JoinClassActivity::class.java))
             }
 
         adapter = ClassListAdapter(mutableListOf())
         homeworkListView.adapter = adapter
 
-        // 点击某个班级（注意 header 偏移）
         homeworkListView.setOnItemClickListener { _, _, position, _ ->
             val realPos = position - homeworkListView.headerViewsCount
             if (realPos !in 0 until adapter.items.size) return@setOnItemClickListener
             val item = adapter.items[realPos]
-            Toast.makeText(this, "进入班级：${item.className}（id=${item.classId}）", Toast.LENGTH_SHORT).show()
-            // val intent = Intent(this, ClassDetailActivity::class.java)
-            // intent.putExtra("classId", item.classId)
-            // startActivity(intent)
+            val it = Intent(this, ClassAssignmentActivity::class.java)
+                .putExtra("classId", item.classId)
+                .putExtra("className", item.className)
+            startActivity(it)
         }
 
-        // 拉取我的班级
-        loadMyClasses()
+        // 注意：不在 onCreate 里主动拉取，避免与 onResume 重复
+        // loadMyClasses()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        loadMyClasses()  // 每次回到这个页面都重刷
     }
 
     private fun loadMyClasses() {
+        if (isLoading) return
+        isLoading = true
+
         uiScope.launch {
             try {
                 val resp = withContext(Dispatchers.IO) { api.viewClass() }
@@ -134,6 +136,8 @@ class ClassActivity : AppCompatActivity() {
                 e.printStackTrace()
                 Toast.makeText(this@ClassActivity, "未知错误：${e.message}", Toast.LENGTH_SHORT).show()
                 adapter.replace(emptyList())
+            } finally {
+                isLoading = false
             }
         }
     }

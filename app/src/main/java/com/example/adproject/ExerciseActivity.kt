@@ -20,17 +20,20 @@ class ExerciseActivity : AppCompatActivity() {
 
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-    // 当前搜索词 & 防抖任务
+    // 搜索
     private var currentQuery: String = ""
     private var searchJob: Job? = null
 
-    // 固定选项（全量，仅做兜底）
-    private val gradeOptions = arrayOf(
+    // 是否进入“收紧模式”：存在任一筛选或搜索时为 true（全部清空后回到 false）
+    private var hasInteracted = false
+
+    // 默认兜底（首次/清空时使用）
+    private val gradeDefaults = listOf(
         "grade1","grade2","grade3","grade4","grade5","grade6",
         "grade7","grade8","grade9","grade10","grade11","grade12"
     )
-    private val subjectOptions = arrayOf("language science","natural science","social science")
-    private val categoryOptions = arrayOf(
+    private val subjectDefaults = listOf("language science","natural science","social science")
+    private val categoryDefaults = listOf(
         "Adaptations","Adaptations and natural selection","Age of Exploration","Analyzing literature",
         "Anatomy and physiology","Animals","Asia: society and environment","Astronomy","Atoms and molecules",
         "Author's purpose","Author's purpose and tone","Basic economic principles","Banking and finance",
@@ -55,24 +58,24 @@ class ExerciseActivity : AppCompatActivity() {
         "Topographic maps","Traits","Traits and heredity","Units and measurement","Velocity, acceleration, and forces",
         "Verb tense","Visual elements","Water cycle","Weather and climate","Word usage and nuance","World religions"
     )
-    private val topicOptions = arrayOf(
+    private val topicDefaults = listOf(
         "capitalization","chemistry","civics","culture","economics","earth-science",
         "figurative-language","global-studies","grammar","literacy-in-science","phonological-awareness",
         "physics","pronouns","punctuation","reading-comprehension","reference-skills","science-and-engineering-practices",
-        "topicOptions","units-and-measurement","us-history","verbs","vocabulary","word-study",
+        "units-and-measurement","us-history","verbs","vocabulary","word-study",
         "world-history","writing-strategies"
     )
 
-    // 当前可选项（由返回数据动态收敛）
-    private var currentSubjectOptions = subjectOptions.toMutableList()
-    private var currentCategoryOptions = categoryOptions.toMutableList()
-    private var currentTopicOptions    = topicOptions.toMutableList()
+    // 当前可选项（由结果数据动态收紧；用于 Subject/Category/Topic）
+    private var currentSubjectOptions  = subjectDefaults.toMutableList()
+    private var currentCategoryOptions = categoryDefaults.toMutableList()
+    private var currentTopicOptions    = topicDefaults.toMutableList()
 
-    // 用户已选
-    private val selectedGrades = mutableSetOf<String>()
-    private val selectedSubjects = mutableSetOf<String>()
-    private val selectedCategories = mutableSetOf<String>()
-    private val selectedTopics = mutableSetOf<String>()
+    // —— 单选选择 —— //
+    private var selectedGrade: String? = null
+    private var selectedSubject: String? = null
+    private var selectedCategory: String? = null
+    private var selectedTopic: String? = null
 
     // 列表 & 适配器
     private lateinit var adapter: QuestionAdapter
@@ -81,6 +84,12 @@ class ExerciseActivity : AppCompatActivity() {
     // 分页
     private var currentPage = 1
     private var isLoading = false
+
+    // 按钮
+    private lateinit var btnGrade: Button
+    private lateinit var btnSubject: Button
+    private lateinit var btnCategory: Button
+    private lateinit var btnTopic: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -98,10 +107,10 @@ class ExerciseActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        val gradeButton = findViewById<Button>(R.id.gradeButton)
-        val subjectButton = findViewById<Button>(R.id.subjectButton)
-        val categoryButton = findViewById<Button>(R.id.categoryButton)
-        val topicButton = findViewById<Button>(R.id.topicButton)
+        btnGrade = findViewById(R.id.gradeButton)
+        btnSubject = findViewById(R.id.subjectButton)
+        btnCategory = findViewById(R.id.categoryButton)
+        btnTopic = findViewById(R.id.topicButton)
 
         questionList = findViewById(R.id.questionList)
 
@@ -111,6 +120,7 @@ class ExerciseActivity : AppCompatActivity() {
         // 点击放大镜
         searchIcon.setOnClickListener {
             currentQuery = searchInput.text?.toString()?.trim().orEmpty()
+            hasInteracted = !noFilters()
             applyFilters()
             hideKeyboard(searchInput)
         }
@@ -118,6 +128,7 @@ class ExerciseActivity : AppCompatActivity() {
         searchInput.setOnEditorActionListener { v, actionId, _ ->
             if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
                 currentQuery = v.text?.toString()?.trim().orEmpty()
+                hasInteracted = !noFilters()
                 applyFilters()
                 hideKeyboard(searchInput)
                 true
@@ -134,6 +145,7 @@ class ExerciseActivity : AppCompatActivity() {
                     delay(400)
                     if (text != currentQuery) {
                         currentQuery = text
+                        hasInteracted = !noFilters()
                         applyFilters()
                     }
                 }
@@ -144,24 +156,69 @@ class ExerciseActivity : AppCompatActivity() {
         adapter = QuestionAdapter(this, mutableListOf())
         questionList.adapter = adapter
 
-        // 年级按钮（固定候选 → 影响后续动态收敛）
-        gradeButton.setOnClickListener {
-            showMultiChoiceDialog(
-                title = "Select Grade",
-                displayOptions = gradeOptions.toList(),
-                selectedSet = selectedGrades
-            )
+        // —— 四个按钮：满足你描述的交互 —— //
+        btnGrade.setOnClickListener {
+            coroutineScope.launch {
+                val options = when {
+                    selectedGrade != null -> listOf(selectedGrade!!)           // 已选：只显示自己
+                    noFilters() -> gradeDefaults                               // 无任何筛选：全量
+                    else -> fetchFacetOptions("grade")                         // 有其它筛选：按其余条件动态计算
+                }
+                showSingleChoiceDialog("Select Grade", options.ifEmpty { gradeDefaults }, selectedGrade) { chosen ->
+                    selectedGrade = chosen
+                    btnGrade.text = chosen ?: "Grade"
+                    hasInteracted = !noFilters()
+                    applyFilters()
+                }
+            }
         }
 
-        // 下级三个按钮使用“当前可选项”（由结果集动态驱动）
-        subjectButton.setOnClickListener {
-            showMultiChoiceDialog("Select Subject", currentSubjectOptions, selectedSubjects)
+        btnSubject.setOnClickListener {
+            coroutineScope.launch {
+                val options = when {
+                    selectedSubject != null -> listOf(selectedSubject!!)
+                    noFilters() -> subjectDefaults
+                    else -> fetchFacetOptions("subject")
+                }
+                showSingleChoiceDialog("Select Subject", options.ifEmpty { currentSubjectOptions }, selectedSubject) { chosen ->
+                    selectedSubject = chosen
+                    btnSubject.text = chosen ?: "Subject"
+                    hasInteracted = !noFilters()
+                    applyFilters()
+                }
+            }
         }
-        categoryButton.setOnClickListener {
-            showMultiChoiceDialog("Select Category", currentCategoryOptions, selectedCategories)
+
+        btnCategory.setOnClickListener {
+            coroutineScope.launch {
+                val options = when {
+                    selectedCategory != null -> listOf(selectedCategory!!)
+                    noFilters() -> categoryDefaults
+                    else -> fetchFacetOptions("category")
+                }
+                showSingleChoiceDialog("Select Category", options.ifEmpty { currentCategoryOptions }, selectedCategory) { chosen ->
+                    selectedCategory = chosen
+                    btnCategory.text = chosen ?: "Category"
+                    hasInteracted = !noFilters()
+                    applyFilters()
+                }
+            }
         }
-        topicButton.setOnClickListener {
-            showMultiChoiceDialog("Select Topic", currentTopicOptions, selectedTopics)
+
+        btnTopic.setOnClickListener {
+            coroutineScope.launch {
+                val options = when {
+                    selectedTopic != null -> listOf(selectedTopic!!)
+                    noFilters() -> topicDefaults
+                    else -> fetchFacetOptions("topic")
+                }
+                showSingleChoiceDialog("Select Topic", options.ifEmpty { currentTopicOptions }, selectedTopic) { chosen ->
+                    selectedTopic = chosen
+                    btnTopic.text = chosen ?: "Topic"
+                    hasInteracted = !noFilters()
+                    applyFilters()
+                }
+            }
         }
 
         // 底部导航
@@ -200,10 +257,10 @@ class ExerciseActivity : AppCompatActivity() {
         }
 
         // 滚动触底自动加载
-        questionList.setOnScrollListener(object : android.widget.AbsListView.OnScrollListener {
-            override fun onScrollStateChanged(view: android.widget.AbsListView, scrollState: Int) {}
+        questionList.setOnScrollListener(object : AbsListView.OnScrollListener {
+            override fun onScrollStateChanged(view: AbsListView?, scrollState: Int) {}
             override fun onScroll(
-                view: android.widget.AbsListView,
+                view: AbsListView?,
                 firstVisibleItem: Int,
                 visibleItemCount: Int,
                 totalItemCount: Int
@@ -219,30 +276,70 @@ class ExerciseActivity : AppCompatActivity() {
         applyFilters()
     }
 
-    // 仅使用“显示集合”的弹窗，保证勾选与显示一致
-    private fun showMultiChoiceDialog(
-        title: String,
-        displayOptions: List<String>,
-        selectedSet: MutableSet<String>
-    ) {
-        val checkedItems = BooleanArray(displayOptions.size) { i ->
-            displayOptions[i] in selectedSet
+    /** 是否完全没有筛选与搜索 */
+    private fun noFilters(): Boolean =
+        selectedGrade == null &&
+                selectedSubject == null &&
+                selectedCategory == null &&
+                selectedTopic == null &&
+                currentQuery.isBlank()
+
+    /** 打开弹窗前：忽略自身维度，按其余筛选动态计算候选（抓 1~3 页即可） */
+    private suspend fun fetchFacetOptions(facet: String): List<String> = withContext(Dispatchers.IO) {
+        val result = linkedSetOf<String>()
+        var page = 1
+        val maxPages = 3
+        while (page <= maxPages) {
+            val resp = api.viewQuestion(
+                keyword = "",
+                questionName = currentQuery,
+                grade     = if (facet == "grade") ""    else (selectedGrade ?: ""),
+                subject   = if (facet == "subject") ""  else (selectedSubject ?: ""),
+                category  = if (facet == "category") "" else (selectedCategory ?: ""),
+                topic     = if (facet == "topic") ""    else (selectedTopic ?: ""),
+                page = page,
+                questionIndex = -1
+            )
+            if (!resp.isSuccessful) break
+            val items = resp.body()?.data?.items ?: emptyList()
+            if (items.isEmpty()) break
+
+            for (q in items) {
+                val v = when (facet) {
+                    "grade"    -> q.grade
+                    "subject"  -> q.subject
+                    "category" -> q.category
+                    "topic"    -> q.topic
+                    else -> null
+                }?.trim()
+                if (!v.isNullOrEmpty()) result += v
+            }
+            page++
         }
+        result.toList().sorted()
+    }
+
+    /** 单选弹窗 */
+    private fun showSingleChoiceDialog(
+        title: String,
+        options: List<String>,
+        current: String?,
+        onPicked: (String?) -> Unit
+    ) {
+        val display = options.toTypedArray()
+        var chosenIndex = if (current != null) options.indexOf(current) else -1
 
         AlertDialog.Builder(this)
             .setTitle(title)
-            .setMultiChoiceItems(displayOptions.toTypedArray(), checkedItems) { _, which, isChecked ->
-                val value = displayOptions[which]
-                if (isChecked) selectedSet.add(value) else selectedSet.remove(value)
+            .setSingleChoiceItems(display, chosenIndex) { _, which ->
+                chosenIndex = which
             }
             .setPositiveButton("Apply") { d, _ ->
-                applyFilters()
+                onPicked(if (chosenIndex in options.indices) options[chosenIndex] else null)
                 d.dismiss()
             }
             .setNegativeButton("Clear") { d, _ ->
-                selectedSet.clear()
-                applyFilters()
-                d.dismiss()
+                onPicked(null); d.dismiss()
             }
             .setNeutralButton("Cancel") { d, _ -> d.dismiss() }
             .show()
@@ -256,24 +353,19 @@ class ExerciseActivity : AppCompatActivity() {
         selectedButton.isSelected = true
     }
 
-    /** 应用当前筛选（包含搜索词）→ 刷新第一页，并重建级联候选项 */
+    /** 应用筛选并刷新第一页；随后重建候选 */
     private fun applyFilters() {
         currentPage = 1
         coroutineScope.launch {
             try {
-                val gradeParam = selectedGrades.joinToString(",")
-                val subjectParam = selectedSubjects.joinToString(",")
-                val categoryParam = selectedCategories.joinToString(",")
-                val topicParam = selectedTopics.joinToString(",")
-
                 val response = withContext(Dispatchers.IO) {
                     api.viewQuestion(
                         keyword = "",
                         questionName = currentQuery,
-                        grade = gradeParam,
-                        subject = subjectParam,
-                        topic = topicParam,
-                        category = categoryParam,
+                        grade = selectedGrade ?: "",
+                        subject = selectedSubject ?: "",
+                        topic = selectedTopic ?: "",
+                        category = selectedCategory ?: "",
                         page = currentPage,
                         questionIndex = -1
                     )
@@ -306,7 +398,7 @@ class ExerciseActivity : AppCompatActivity() {
         }
     }
 
-    /** 滚动触底或“下一题”末尾触发的加载下一页 */
+    /** 触底加载下一页 */
     fun loadNextPage(onAppended: ((List<QsInform>) -> Unit)? = null) {
         if (isLoading) return
         isLoading = true
@@ -314,19 +406,14 @@ class ExerciseActivity : AppCompatActivity() {
 
         coroutineScope.launch {
             try {
-                val gradeParam = selectedGrades.joinToString(",")
-                val subjectParam = selectedSubjects.joinToString(",")
-                val categoryParam = selectedCategories.joinToString(",")
-                val topicParam = selectedTopics.joinToString(",")
-
                 val response = withContext(Dispatchers.IO) {
                     api.viewQuestion(
                         keyword = "",
                         questionName = currentQuery,
-                        grade = gradeParam,
-                        subject = subjectParam,
-                        topic = topicParam,
-                        category = categoryParam,
+                        grade = selectedGrade ?: "",
+                        subject = selectedSubject ?: "",
+                        topic = selectedTopic ?: "",
+                        category = selectedCategory ?: "",
                         page = nextPage,
                         questionIndex = -1
                     )
@@ -369,39 +456,49 @@ class ExerciseActivity : AppCompatActivity() {
         }
     }
 
-    /** 级联：根据当前列表数据重建 subject/category/topic 候选项，并清理无效已选 */
+    /**
+     * 重建可选项：
+     * - 尚未交互：保持全量默认（不收紧）
+     * - 收紧模式：用当前列表数据收紧 Subject/Category/Topic（Grade 不依赖当前页）
+     */
     private fun rebuildFacetOptionsFromData() {
-        val data = adapter.getData()
-
-        if (data.isEmpty()) {
-            // 如果这一页没数据，保留当前候选（或退回全量）
-            currentSubjectOptions = subjectOptions.toMutableList()
-            currentCategoryOptions = categoryOptions.toMutableList()
-            currentTopicOptions    = topicOptions.toMutableList()
+        if (!hasInteracted) {
+            currentSubjectOptions  = subjectDefaults.toMutableList()
+            currentCategoryOptions = categoryDefaults.toMutableList()
+            currentTopicOptions    = topicDefaults.toMutableList()
             return
         }
 
-        // ⚠️ 确保 QsInform 的字段名确实是 subject/category/topic，否则改成你的真实字段
+        val data = adapter.getData()
+        if (data.isEmpty()) {
+            currentSubjectOptions  = subjectDefaults.toMutableList()
+            currentCategoryOptions = categoryDefaults.toMutableList()
+            currentTopicOptions    = topicDefaults.toMutableList()
+            return
+        }
+
+        // ⚠️ 若 QsInform 字段名不同，请改成你的实际字段
         val subjectsInData   = data.mapNotNull { it.subject?.trim() }.filter { it.isNotEmpty() }.toSet()
         val categoriesInData = data.mapNotNull { it.category?.trim() }.filter { it.isNotEmpty() }.toSet()
         val topicsInData     = data.mapNotNull { it.topic?.trim() }.filter { it.isNotEmpty() }.toSet()
 
-        currentSubjectOptions =
-            if (subjectsInData.isNotEmpty()) subjectsInData.sorted().toMutableList()
-            else currentSubjectOptions // 不回全量，尽量保持“动态”
+        if (subjectsInData.isNotEmpty())   currentSubjectOptions  = subjectsInData.sorted().toMutableList()
+        if (categoriesInData.isNotEmpty()) currentCategoryOptions = categoriesInData.sorted().toMutableList()
+        if (topicsInData.isNotEmpty())     currentTopicOptions    = topicsInData.sorted().toMutableList()
 
-        currentCategoryOptions =
-            if (categoriesInData.isNotEmpty()) categoriesInData.sorted().toMutableList()
-            else currentCategoryOptions
-
-        currentTopicOptions =
-            if (topicsInData.isNotEmpty()) topicsInData.sorted().toMutableList()
-            else currentTopicOptions
-
-        // 清理不再合法的已选
-        selectedSubjects.retainAll(currentSubjectOptions.toSet())
-        selectedCategories.retainAll(currentCategoryOptions.toSet())
-        selectedTopics.retainAll(currentTopicOptions.toSet())
+        // 选择合法性（grade 只需在全量里）
+        if (selectedSubject != null && selectedSubject !in currentSubjectOptions) {
+            selectedSubject = null; btnSubject.text = "Subject"
+        }
+        if (selectedCategory != null && selectedCategory !in currentCategoryOptions) {
+            selectedCategory = null; btnCategory.text = "Category"
+        }
+        if (selectedTopic != null && selectedTopic !in currentTopicOptions) {
+            selectedTopic = null; btnTopic.text = "Topic"
+        }
+        if (selectedGrade != null && selectedGrade !in gradeDefaults) {
+            selectedGrade = null; btnGrade.text = "Grade"
+        }
     }
 
     private fun hideKeyboard(view: View) {
@@ -415,10 +512,7 @@ class ExerciseActivity : AppCompatActivity() {
         val data = adapter.getData()
         val idx = data.indexOfFirst { it.id == currentId }
         if (idx == -1) { onReady(null); return }
-
-        if (idx + 1 < data.size) {
-            onReady(data[idx + 1].id); return
-        }
+        if (idx + 1 < data.size) { onReady(data[idx + 1].id); return }
         loadNextPage { appended ->
             if (appended.isNotEmpty()) onReady(appended.first().id) else onReady(null)
         }
@@ -442,3 +536,4 @@ class ExerciseActivity : AppCompatActivity() {
         coroutineScope.cancel()
     }
 }
+

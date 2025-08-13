@@ -4,18 +4,35 @@ import com.example.adproject.model.AnnouncementResponse
 import com.example.adproject.model.AnswerResponse
 import com.example.adproject.model.DashboardResponse
 import com.example.adproject.model.JoinClassResponse
+import com.example.adproject.model.LeaveClassResponse
+import com.example.adproject.model.LoginRequest
+import com.example.adproject.model.LoginResultVO
 import com.example.adproject.model.QsInform
 import com.example.adproject.model.QsResultDTO
+import com.example.adproject.model.RegisterRequest
 import com.example.adproject.model.Result
+import com.example.adproject.model.SelectAssignmentResponse
 import com.example.adproject.model.SelectQuestionDTO
 import com.example.adproject.model.ViewClassResponse
 import com.google.gson.JsonObject
 import retrofit2.Response
+import retrofit2.http.Body
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Query
 
 interface ApiService {
+
+    /** POST /student/login ，JSON 请求体（@RequestBody LoginDTO） */
+    @POST("login")
+    suspend fun login(@Body body: LoginRequest): Response<LoginResultVO>
+
+    // 注册（@RequestBody RegisterRequest）
+    @POST("register")
+    suspend fun register(@Body body: RegisterRequest): Response<Result<Unit>>
 
     // ====== 题库 ======
     @GET("viewQuestion")
@@ -64,9 +81,21 @@ interface ApiService {
     @GET("selectAnnouncement")
     suspend fun selectAnnouncement(@Query("classId") classId: Int): Response<AnnouncementResponse>
 
-    @GET("joinClass")
+    @POST("joinClass")
     suspend fun joinClass(
         @Query("accessType") accessType: String, // "byName" / "byLink"
         @Query("key") key: String                // name 或 token
     ): Response<JoinClassResponse>
+
+    @POST("leaveClass") // ← 相对路径
+    suspend fun leaveClass(@Query("classId") classId: Long): Response<LeaveClassResponse>
+
+    @GET("selectClass") // 班级assignment
+    suspend fun selectClass(
+        @Query("classId") classId: Int
+    ): retrofit2.Response<com.example.adproject.model.SelectClassDetailResponse>
+
+    @GET("selectAssignment")
+    suspend fun selectAssignment(@Query("assignmentId") assignmentId: Int)
+            : retrofit2.Response<SelectAssignmentResponse>
 }

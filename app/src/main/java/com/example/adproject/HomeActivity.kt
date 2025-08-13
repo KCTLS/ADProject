@@ -9,23 +9,27 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class HomeActivity : AppCompatActivity() {
-
-    // 本地会话存储名字（和键），你也可以统一到单独的 UserSession 工具类中
-    private val PREF_NAME = "user_session"
-    private val KEY_USER_ID = "user_id"
-    private val KEY_USER_NAME = "user_name"   // 如果后端返回用户名，可以一起保存
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.activity_home)
 
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+        // 没登录就直接回登录页
+        ensureLoggedInOrGoLogin()
+
+        // Edge-to-edge insets（你的布局里根容器 id 需为 main；没有就去掉这段）
+        val mainId = resources.getIdentifier("main", "id", packageName)
+        if (mainId != 0) {
+            ViewCompat.setOnApplyWindowInsetsListener(findViewById(mainId)) { v, insets ->
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+                v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                insets
+            }
         }
 
         // 底部导航
@@ -42,8 +46,8 @@ class HomeActivity : AppCompatActivity() {
         // 默认选中 Home
         setSelectedButton(homeButton)
 
-        // （可选）把用户名展示到卡片上：布局里如果给用户名 TextView 起了 id（比如 userNameText），这里就能设置
-        setUserNameIfPossible()
+        // 显示用户名（布局里给用户名 TextView 起个 id：@+id/userNameText）
+        setUserNameIfPresent()
 
         // 底部导航点击
         exerciseButton.setOnClickListener {
@@ -60,73 +64,75 @@ class HomeActivity : AppCompatActivity() {
         }
         homeButton.setOnClickListener {
             setSelectedButton(homeButton)
-            // 留在当前页
+            // 当前页，无操作
         }
 
         // 账户/设置
         profileButton.setOnClickListener {
-            // TODO: 跳到账号管理页
             Toast.makeText(this, "Go to Account Management", Toast.LENGTH_SHORT).show()
+            // TODO: startActivity(Intent(this, ProfileActivity::class.java))
         }
         settingsButton.setOnClickListener {
-            // TODO: 跳到设置页
             Toast.makeText(this, "Go to Settings", Toast.LENGTH_SHORT).show()
+            // TODO: startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         // 退出登录
         logoutButton.setOnClickListener {
-            logoutAndGoLogin()
-        }
-
-        // 如果没登录（user_id 缺失或为 -1），直接去登录页
-        ensureLoggedInOrGoLogin()
-    }
-
-    private fun setSelectedButton(selectedButton: Button) {
-        findViewById<Button>(R.id.exerciseButton).isSelected = false
-        findViewById<Button>(R.id.dashboardButton).isSelected = false
-        findViewById<Button>(R.id.classButton).isSelected = false
-        findViewById<Button>(R.id.homeButton).isSelected = false
-        selectedButton.isSelected = true
-    }
-
-    private fun ensureLoggedInOrGoLogin() {
-        val userId = getSharedPreferences(PREF_NAME, MODE_PRIVATE).getInt(KEY_USER_ID, -1)
-        if (userId == -1) {
-            // 未登录，跳转登录页
+            UserSession.clear(this)
             goLoginClearBackStack()
         }
     }
 
-    private fun logoutAndGoLogin() {
-        // 清空会话
-        getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit().clear().apply()
-        // 跳到登录页并清空返回栈
-        goLoginClearBackStack()
+    // HomeActivity.kt 里
+    override fun onResume() {
+        super.onResume()
+        ensureLoggedInOrGoLogin()
+        // 兜底：顺手 ping 一个需要登录的接口（如 dashboard）
+        lifecycleScope.launch {
+            try {
+                val r = com.example.adproject.api.ApiClient.api.dashboard()
+                if (!r.isSuccessful) {
+                    val e = r.errorBody()?.string().orEmpty()
+                    if (r.code() == 401 || e.contains("未登录") || e.contains("会话已失效")) {
+                        UserSession.clear(this@HomeActivity)
+                        goLoginClearBackStack()
+                    }
+                }
+            } catch (_: Exception) { /* 网络异常忽略，保留现状 */ }
+        }
+    }
+
+
+    /** 如果未登录，跳到登录页并清空返回栈 */
+    private fun ensureLoggedInOrGoLogin() {
+        if (!UserSession.isLoggedIn(this)) {
+            goLoginClearBackStack()
+        }
     }
 
     private fun goLoginClearBackStack() {
-        // 把 LoginActivity 换成你的实际登录页类名
-        val intent = Intent(this, LoginActivity::class.java).apply {
+        startActivity(Intent(this, LoginActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        }
-        startActivity(intent)
-        // finish() 不一定必要，因为我们加了 CLEAR_TASK
+        })
+        // CLEAR_TASK 已经清栈，finish 可省略
     }
 
-    /**
-     * 可选：展示用户名（如果你在登录成功时把用户名存入了 SharedPreferences）
-     * 你的布局里当前 “Jason” 的 TextView 没有 id，如果你愿意给它加一个 id（如 @+id/userNameText），
-     * 这里就可以自动替换成真实用户名。
-     */
-    private fun setUserNameIfPossible() {
-        val id = resources.getIdentifier("userNameText", "id", packageName)
-        if (id != 0) {
-            val tv = findViewById<TextView>(id)
-            val userName = getSharedPreferences(PREF_NAME, MODE_PRIVATE).getString(KEY_USER_NAME, null)
-            if (!userName.isNullOrBlank()) {
-                tv.text = userName
-            }
+    private fun setSelectedButton(selectedButton: Button) {
+        findViewById<Button>(R.id.exerciseButton)?.isSelected = false
+        findViewById<Button>(R.id.dashboardButton)?.isSelected = false
+        findViewById<Button>(R.id.classButton)?.isSelected = false
+        findViewById<Button>(R.id.homeButton)?.isSelected = false
+        selectedButton.isSelected = true
+    }
+
+    private fun setUserNameIfPresent() {
+        val userNameViewId = resources.getIdentifier("userNameText", "id", packageName)
+        if (userNameViewId != 0) {
+            val tv = findViewById<TextView>(userNameViewId)
+            val name = UserSession.name(this)
+            if (!name.isNullOrBlank()) tv.text = name
         }
     }
+
 }

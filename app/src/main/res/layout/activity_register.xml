@@ -37,6 +37,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
+            <!-- 姓名 -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/inputName"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -50,6 +51,7 @@
                     android:layout_height="wrap_content"/>
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- 邮箱 -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/inputEmail"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -64,6 +66,7 @@
                     android:layout_height="wrap_content"/>
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- 密码 -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/inputPassword"
                 style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
@@ -79,6 +82,110 @@
                     android:layout_height="wrap_content"/>
             </com.google.android.material.textfield.TextInputLayout>
 
+            <!-- 地址 -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/inputAddress"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:hint="Address"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:inputType="textPostalAddress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- 电话 -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/inputPhone"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:hint="Phone"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:inputType="phone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- 性别（下拉） -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/inputGender"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                android:hint="Gender"
+                app:startIconDrawable="@drawable/ic_user"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
+                    android:id="@+id/dropGender"
+                    android:inputType="none"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:focusable="false"
+                    android:clickable="true"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- 分组 -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/inputGroup"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:hint="Group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:inputType="text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Title -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/inputTitle"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:hint="Title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:inputType="text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- 个性签名 -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/inputSignature"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:hint="Signature"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:inputType="textMultiLine"
+                    android:minLines="2"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- Tags（逗号分隔） -->
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/inputTags"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                android:hint="Tags (comma separated)"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:inputType="text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <!-- 注册按钮 -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnRegister"
                 android:text="Create Account"
@@ -89,6 +196,17 @@
                 android:backgroundTint="@color/black"
                 android:textAllCaps="false"/>
 
+            <!-- Loading -->
+            <ProgressBar
+                android:id="@+id/progressBar"
+                style="@android:style/Widget.DeviceDefault.Light.ProgressBar.Small"
+                android:visibility="gone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="12dp"/>
+
+            <!-- 跳到登录 -->
             <TextView
                 android:id="@+id/linkToLogin"
                 android:text="Already have an account?  Sign in →"
@@ -99,6 +217,7 @@
                 android:layout_marginTop="16dp"/>
 
         </LinearLayout>
+
     </com.google.android.material.card.MaterialCardView>
 
     <ImageView

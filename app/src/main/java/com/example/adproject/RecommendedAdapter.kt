@@ -18,7 +18,7 @@ class RecommendedAdapter(
 ) : RecyclerView.Adapter<RecommendedAdapter.VH>() {
 
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
-        val icon: ImageView = v.findViewById(R.id.icon)
+        // 去掉 icon
         val title: TextView = v.findViewById(R.id.title)
         val subtitle: TextView = v.findViewById(R.id.subtitle)
         val badge: TextView = v.findViewById(R.id.badge)
@@ -41,7 +41,7 @@ class RecommendedAdapter(
         val b64 = item.imageBase64
         if (!b64.isNullOrBlank()) {
             try {
-                val bytes = Base64.decode(b64, Base64.DEFAULT)
+                val bytes = Base64.decode(b64.substringAfter(","), Base64.DEFAULT)
                 val input = ByteArrayInputStream(bytes)
                 val bm = BitmapFactory.decodeStream(input)
                 h.thumb.setImageBitmap(bm)
@@ -53,6 +53,7 @@ class RecommendedAdapter(
         }
 
         h.startBtn.setOnClickListener { onStart(item) }
+        h.itemView.setOnClickListener { onStart(item) } // 整卡可点
     }
 
     override fun getItemCount(): Int = data.size
@@ -63,7 +64,6 @@ class RecommendedAdapter(
         notifyDataSetChanged()
     }
 
-    /** 兜底去重：同 id 已存在则更新，否则插入 */
     fun addItem(item: RecommendedPractice) {
         val i = data.indexOfFirst { it.id == item.id }
         if (i >= 0) {

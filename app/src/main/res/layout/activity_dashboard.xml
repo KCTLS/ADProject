@@ -129,26 +129,7 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
 
-            <!-- 直接接在图表下的按钮们 -->
-            <Button
-                android:id="@+id/wrongAnswerBookButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="20dp"
-                android:layout_marginEnd="20dp"
-                android:layout_marginTop="24dp"
-                android:background="@drawable/button_rounded_background"
-                android:drawableStart="@drawable/book"
-                android:drawablePadding="8dp"
-                android:gravity="center"
-                android:padding="16dp"
-                android:text="Wrong Answer Book"
-                android:textAllCaps="false"
-                android:textColor="#000000"
-                android:textSize="16sp"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/chartView" />
+            <!-- ★ 删除了 wrongAnswerBookButton，以下两个按钮顺次上移 -->
 
             <Button
                 android:id="@+id/recommendedPracticeButton"
@@ -156,7 +137,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="20dp"
                 android:layout_marginEnd="20dp"
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="24dp"
                 android:background="@drawable/button_rounded_background"
                 android:drawableStart="@drawable/pen"
                 android:drawablePadding="8dp"
@@ -168,7 +149,7 @@
                 android:textSize="16sp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/wrongAnswerBookButton" />
+                app:layout_constraintTop_toBottomOf="@id/chartView" />
 
             <Button
                 android:id="@+id/answerHistoryButton"

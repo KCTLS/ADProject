@@ -4,6 +4,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -14,7 +15,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.ADProject"
         tools:targetApi="31"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:name=".App">
 
         <!-- 登录页：作为入口，必须 android:exported="true" -->
         <activity
@@ -43,6 +46,9 @@
         <activity android:name=".JoinClassActivity" android:exported="false"/>
         <activity android:name=".RecommendedActivity" android:exported="false"/>
         <activity android:name=".AnswerHistoryActivity" android:exported="false"/>
+        <activity android:name=".LeaveClassActivity" android:exported="false"/>
+        <activity android:name=".ClassAssignmentActivity" />
+        <activity android:name=".AssignmentDoActivity" />
     </application>
 
 </manifest>
