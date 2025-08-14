@@ -109,6 +109,6 @@ interface ApiService {
         @Query("assignmentId") assignmentId: Int,
         @Query("whether") whether: Int,
         @Query("accuracy") accuracy: Double
-    ): Response<Result<Unit>>
+    ): Result<String>   // 👈 改这里
 
 }

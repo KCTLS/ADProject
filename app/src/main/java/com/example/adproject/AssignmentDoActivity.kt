@@ -1,6 +1,7 @@
 package com.example.adproject
 
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -15,16 +16,21 @@ import androidx.recyclerview.widget.RecyclerView
 import com.example.adproject.api.ApiClient
 import com.example.adproject.model.AssignmentQuestion
 import com.example.adproject.model.SelectAssignmentResponse
-import com.google.android.material.appbar.MaterialToolbar
+import com.example.adproject.model.SelectQuestionDTO
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.coroutineScope
+import com.google.android.material.appbar.MaterialToolbar
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 class AssignmentDoActivity : AppCompatActivity() {
+
     private val api by lazy { ApiClient.api }
+
     private var assignmentId = -1
     private var titleName = ""
 
@@ -50,6 +56,7 @@ class AssignmentDoActivity : AppCompatActivity() {
 
         assignmentId = intent.getIntExtra("assignmentId", -1)
         titleName = intent.getStringExtra("assignmentName") ?: ""
+
         toolbar = findViewById(R.id.topAppBar)
         rv = findViewById(R.id.rv)
         tvProgress = findViewById(R.id.tvProgress)
@@ -62,9 +69,7 @@ class AssignmentDoActivity : AppCompatActivity() {
         rv.layoutManager = LinearLayoutManager(this)
         rv.adapter = adapter
 
-        btnFinish.setOnClickListener {
-            lifecycleScope.launch { submitAssignment() }
-        }
+        btnFinish.setOnClickListener { lifecycleScope.launch { submitAssignment() } }
 
         loadQuestions()
     }
@@ -82,14 +87,16 @@ class AssignmentDoActivity : AppCompatActivity() {
         lifecycleScope.launch {
             questions = withContext(Dispatchers.IO) {
                 try {
-                    val resp = api.selectAssignment(assignmentId)
+                    val resp = api.selectAssignment(assignmentId) // Response<SelectAssignmentResponse>
                     val body: SelectAssignmentResponse? = resp.body()
                     if (resp.isSuccessful && body?.code == 1) {
                         body.data?.list.orEmpty()
                     } else {
+                        Log.w("AssignmentDo", "selectAssignment fail: http=${resp.code()} code=${body?.code} msg=${body?.msg}")
                         emptyList()
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Log.e("AssignmentDo", "selectAssignment error", e)
                     emptyList()
                 }
             }
@@ -121,43 +128,49 @@ class AssignmentDoActivity : AppCompatActivity() {
 
         setLoading(true)
 
-        // 并发获取每题正确答案：/student/doquestion?id=...
-        // 你的 SelectQuestionDTO 里只有 answer，可能是 0-based；也可能是 1-based。
-        // 这里做兼容：如果 answer ∈ [1..choices.size]，当作 1-based 转为 0-based；否则直接当 0-based。
+        // 并发获取每题正确答案并判定正确与否
         val results = coroutineScope {
             questions.map { q ->
                 async(Dispatchers.IO) {
                     try {
-                        val resp = api.getQuestionById(q.id)
+                        val resp = api.getQuestionById(q.id) // Response<Result<SelectQuestionDTO>>
                         val body = resp.body()
                         if (resp.isSuccessful && body?.code == 1 && body.data != null) {
-                            val dto = body.data!!
+                            val dto: SelectQuestionDTO = body.data!!
                             val raw = dto.answer
                             val max = dto.choices.size
-                            val correctIndex = if (raw in 1..max) raw - 1 else raw
+                            val correctIndex = if (raw in 1..max) raw - 1 else raw // 兼容 1-based/0-based
                             val my = progressState.answers[q.id]
                             (my != null && my == correctIndex)
                         } else {
+                            Log.w("AssignmentDo", "getQuestionById fail: id=${q.id} http=${resp.code()} code=${body?.code} msg=${body?.msg}")
                             false
                         }
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        Log.e("AssignmentDo", "getQuestionById error id=${q.id}", e)
                         false
                     }
                 }
             }.awaitAll()
         }
 
-
         val correctCount = results.count { it }
         val accuracy = if (total > 0) (correctCount.toDouble() / total) * 100.0 else 0.0
-        val accuracyRounded = String.format("%.2f", accuracy).toDouble()
+        // 四舍五入到 2 位小数（不受 Locale 影响）
+        val accuracyRounded = BigDecimal(accuracy).setScale(2, RoundingMode.HALF_UP).toDouble()
 
-        // 提交完成信息（POST）
+        // 提交完成信息（POST）——接口直接返回 Result<String>
         val ok = withContext(Dispatchers.IO) {
             try {
-                val resp = api.finishAssignment(assignmentId, 1, accuracyRounded)
-                resp.isSuccessful && resp.body()?.code == 1
-            } catch (_: Exception) {
+                val r = api.finishAssignment(assignmentId, 1, accuracyRounded) // Result<String>
+                if (r.code == 1) {
+                    true
+                } else {
+                    Log.w("AssignmentDo", "finishAssignment business fail: code=${r.code}, msg=${r.msg}, data=${r.data}")
+                    false
+                }
+            } catch (e: Exception) {
+                Log.e("AssignmentDo", "finishAssignment error", e)
                 false
             }
         }
@@ -170,7 +183,6 @@ class AssignmentDoActivity : AppCompatActivity() {
             setResult(RESULT_OK)
             finish()
         } else {
-            // 尝试把后端的 msg 打出来更好排错
             Toast.makeText(this, "提交失败，请稍后重试", Toast.LENGTH_SHORT).show()
         }
     }
